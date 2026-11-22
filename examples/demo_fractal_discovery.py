@@ -118,8 +118,9 @@ def run_fractal_depth2_demo():
     G_micro = sub_engine.build_graph(micro_nodes, micro_edges)
     depth2_report = sub_engine.discover_and_promote(G_micro, domain_name="Micro_Pathway")
 
-    h1_id = depth2_report["promoted_holons"]["holon_id"]
-    h2_id = depth2_report["promoted_holons"]["holon_id"]
+    h1_id = depth2_report["promoted_holons"][0]["holon_id"]
+    h2_id = depth2_report["promoted_holons"][1]["holon_id"]
+
 
     # Collapse the two Depth-2 Holons into Objects at Depth 1
     meso_engine = TopologicalHolonEngine(kernel=root_kernel, persistence_threshold=0.35, z_cutoff=2.5)
