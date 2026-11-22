@@ -138,7 +138,7 @@ def run_fractal_depth2_demo():
     G_meso = meso_engine.build_graph(meso_nodes, meso_edges)
     depth1_report = meso_engine.discover_and_promote(G_meso, domain_name="Meso_Organelle")
 
-    promoted_meso = depth1_report["promoted_holons"]
+    promoted_meso = depth1_report["promoted_holons"][0]
     print(f"Depth 2 Holons Promoted: {len(depth2_report['promoted_holons'])}")
     print(f"Depth 1 Meso-Holon:      {promoted_meso['holon_id']} (Missing Pillars: {promoted_meso['missing_pillars']})")
     print("\nActive 3+1 Fractal Kernel Tree:")
