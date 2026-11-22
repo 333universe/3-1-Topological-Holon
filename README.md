@@ -1,5 +1,6 @@
-[![Open In Colab](https://google.com)](https://google.com)
-[![3+1 Topological Holon CI](https://github.com)](https://github.com)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/333universe/3-1-Topological-Holon/blob/main/notebooks/quickstart.ipynb)
+[![3+1 Topological Holon CI](https://github.com/333universe/3-1-Topological-Holon/actions/workflows/ci.yml/badge.svg)](https://github.com/333universe/3-1-Topological-Holon/actions/workflows/ci.yml)
+
 
 # 3+1 Topological Holon Discovery Engine
 
