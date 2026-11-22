@@ -1,3 +1,6 @@
+[![Open In Colab](https://google.com)](https://google.com)
+[![3+1 Topological Holon CI](https://github.com)](https://github.com)
+
 # 3+1 Topological Holon Discovery Engine
 
 A domain-agnostic, scale-invariant discovery engine that unifies **Object–Arrangement Duality**, **Algebraic Topology (Persistent Homology & Betti Signatures)**, and the **3+1 Holographic Systems Architecture (`0.3333 E + 0.3333 B + 0.3333 C + 0.0001 Orchestrator = 1.0000`)**.
