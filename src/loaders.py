@@ -1,28 +1,21 @@
 """Real-World Data Ingestion Adapters for the 3+1 Topological Holon Engine.
 
-Converts raw CSV edge lists, JSON concept triples, and multivariate numerical
-time-series tables into typed (E, B, C, O) Holon graphs ready for (Beta_0, Beta_1, Beta_2)
-homology scanning and cross-domain analogy discovery.
+Converts raw CSV edge lists and multivariate numerical time-series tables
+(with lagged cross-correlation for delayed inhibitory feedback) into typed
+(E, B, C, O) Holon graphs ready for (Beta_0, Beta_1, Beta_2) homology scanning.
 """
 
 import csv
 import io
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple
 import numpy as np
-import networkx as nx
 
 
 def auto_infer_pillars(
     nodes: Dict[str, Dict[str, Any]],
     edges: List[Tuple[str, str, str, float]],
 ) -> Dict[str, Dict[str, Any]]:
-    """Infers 3+1 functional roles (E, B, C, O) for unlabeled nodes from local topology.
-
-    - High inhibitory / feedback participation -> B (Balance)
-    - High transformation / branching degree  -> C (Change)
-    - High directional throughput flow        -> E (Efficiency)
-    - Low-load high-betweenness coordinator   -> O (Orchestrator)
-    """
+    """Infers 3+1 functional roles (E, B, C, O) for unlabeled nodes from local topology."""
     in_deg = {n: 0 for n in nodes}
     out_deg = {n: 0 for n in nodes}
     inhib_count = {n: 0 for n in nodes}
@@ -64,7 +57,7 @@ def load_from_csv_text(
     default_edge_type: str = "AMPLIFIES",
     auto_pillars: bool = True,
 ) -> Tuple[Dict[str, Dict[str, Any]], List[Tuple[str, str, str, float]]]:
-    """Parses CSV relational data with columns: source, target, [edge_type], [weight], [source_pillar], [target_pillar]."""
+    """Parses CSV relational data into typed Holon nodes and normalized edges."""
     reader = csv.DictReader(io.StringIO(csv_content.strip()))
     nodes: Dict[str, Dict[str, Any]] = {}
     edges: List[Tuple[str, str, str, float]] = []
@@ -103,32 +96,49 @@ def load_from_csv_text(
 def load_from_time_series(
     series_dict: Dict[str, List[float]],
     corr_threshold: float = 0.45,
+    max_lag: int = 2,
     auto_pillars: bool = True,
 ) -> Tuple[Dict[str, Dict[str, Any]], List[Tuple[str, str, str, float]]]:
-    """Converts multivariate numerical time-series into a signed topological graph.
+    """Converts multivariate time-series into a signed topological graph.
 
-    Positive correlation (+r) -> AMPLIFIES edge
-    Negative correlation (-r) -> INHIBITS edge
+    Scans lags 0..max_lag so delayed regulatory feedback (where X at time t
+    suppresses Y at time t+lag) is captured as an INHIBITS edge.
     """
     names = list(series_dict.keys())
     matrix = np.array([series_dict[k] for k in names], dtype=float)
-    corr = np.corrcoef(matrix)
-
     nodes = {name: {"label": name} for name in names}
     edges: List[Tuple[str, str, str, float]] = []
 
     n = len(names)
     for i in range(n):
-        for j in range(i + 1, n):
-            r = float(corr[i, j])
-            if np.isnan(r) or abs(r) < corr_threshold:
+        for j in range(n):
+            if i == j:
                 continue
-            # Orient causality by variance / lead-lag proxy (higher variance drives lower variance)
-            var_i = float(np.var(matrix[i]))
-            var_j = float(np.var(matrix[j]))
-            src, dst = (names[i], names[j]) if var_i >= var_j else (names[j], names[i])
-            etype = "AMPLIFIES" if r > 0 else "INHIBITS"
-            edges.append((src, dst, etype, round(abs(r), 4)))
+            best_r = 0.0
+            best_lag = 0
+            for lag in range(0, max_lag + 1):
+                if lag == 0 and i > j:
+                    continue
+                x = matrix[i, : len(matrix[i]) - lag] if lag > 0 else matrix[i]
+                y = matrix[j, lag:] if lag > 0 else matrix[j]
+                if len(x) < 4:
+                    continue
+                r = float(np.corrcoef(x, y)[0, 1])
+                if not np.isnan(r) and abs(r) > abs(best_r):
+                    best_r = r
+                    best_lag = lag
+
+            if abs(best_r) < corr_threshold:
+                continue
+
+            if best_lag > 0:
+                src, dst = names[i], names[j]
+            else:
+                var_i, var_j = float(np.var(matrix[i])), float(np.var(matrix[j]))
+                src, dst = (names[i], names[j]) if var_i >= var_j else (names[j], names[i])
+
+            etype = "AMPLIFIES" if best_r > 0 else "INHIBITS"
+            edges.append((src, dst, etype, round(abs(best_r), 4)))
 
     if auto_pillars:
         nodes = auto_infer_pillars(nodes, edges)
