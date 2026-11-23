@@ -1,186 +1,312 @@
-"""
-3+1 Topological Holon Engine & Discovery Adapter.
-Implements Persistence Filtration, Betti Summaries, MDL Scale-Shifting,
-3+1 Functional Deficit Diagnosis, and Null-Model Z-Surprise Scoring.
+"""Topological Holon Engine with Z2 Simplicial Homology (Beta_0, Beta_1, Beta_2)
+and Iteration 5.0 EMA / Logarithmic Latency Guardrails.
 """
 
+import math
+import time
+from itertools import combinations
+from typing import Dict, Any, List, Tuple, Optional
 import numpy as np
 import networkx as nx
-from .kernel import BaseDomainAdapter
 
-VALID_EDGE_TYPES = {"AMPLIFIES", "INHIBITS", "DELAYS", "TRANSFORMS", "CONTAINS"}
-VALID_PILLARS = {"E", "B", "C", "O"}
+# Fallbacks or stub classes in case kernel is not in the same path
+try:
+    from .kernel import Universal3Plus1Kernel, BaseDomainAdapter
+except (ImportError, ValueError):
+    # Stubs to prevent import failures in a standalone notebook cell
+    class Universal3Plus1Kernel:
+        def __init__(self):
+            self.depth = 1
+        def grow_sub_triad(self, holon_id, profile):
+            return self
+
+    class BaseDomainAdapter:
+        pass
+
+
+class EMATelemetryNormalizer:
+    """Self-calibrating EMA normalizer adapted from Iteration 5.0 Spec."""
+
+    def __init__(self, alpha: float = 0.25):
+        self.alpha = alpha
+        self.ema_means: Dict[str, float] = {}
+        self.ema_vars: Dict[str, float] = {}
+
+    def update_and_score(self, metric_name: str, raw_value: float) -> float:
+        if metric_name not in self.ema_means:
+            self.ema_means[metric_name] = raw_value
+            self.ema_vars[metric_name] = max(1e-6, (raw_value * 0.1) ** 2)
+            return 0.0
+        prev_mean = self.ema_means[metric_name]
+        delta = raw_value - prev_mean
+        new_mean = prev_mean + self.alpha * delta
+        new_var = (1.0 - self.alpha) * (self.ema_vars[metric_name] + self.alpha * (delta ** 2))
+        self.ema_means[metric_name] = new_mean
+        self.ema_vars[metric_name] = max(1e-6, new_var)
+        std_dev = math.sqrt(self.ema_vars[metric_name])
+        return delta / std_dev if std_dev > 0 else 0.0
+
+
+def _gf2_rank(matrix: np.ndarray) -> int:
+    """Computes exact matrix rank over the finite field GF(2) (modulo-2 arithmetic)."""
+    if matrix.size == 0:
+        return 0
+    M = matrix.copy() % 2
+    rows, cols = M.shape
+    rank = 0
+    for col in range(cols):
+        if rank >= rows:
+            break
+        pivot = None
+        for r in range(rank, rows):
+            if M[r, col] == 1:
+                pivot = r
+                break
+        if pivot is None:
+            continue
+        if pivot != rank:
+            M[[rank, pivot]] = M[[pivot, rank]]
+        for r in range(rows):
+            if r != rank and M[r, col] == 1:
+                M[r] ^= M[rank]
+        rank += 1
+    return rank
 
 
 class TopologicalHolonEngine:
-    """Core engine for Persistence Filtration, MDL Scale-Shifting, and Surprise Scoring."""
+    """Scans typed relational graphs for H0 clusters, H1 loops, and H2 enclosed cavities."""
 
-    def __init__(self, kernel, persistence_threshold=0.35, z_cutoff=2.5):
+    VALID_EDGES = {"AMPLIFIES", "INHIBITS", "DELAYS", "TRANSFORMS", "CONTAINS"}
+
+    def __init__(
+        self,
+        kernel: Universal3Plus1Kernel,
+        persistence_threshold: float = 0.35,
+        z_cutoff: float = 2.5,
+        base_latency_limit_ms: float = 50.0,
+    ):
         self.kernel = kernel
         self.persistence_threshold = persistence_threshold
         self.z_cutoff = z_cutoff
-        self.macro_holons = {}
+        self.base_latency_limit_ms = base_latency_limit_ms
+        self.ema = EMATelemetryNormalizer(alpha=0.25)
+        self.macro_holons: Dict[str, Any] = {}
 
-    def build_graph(self, nodes, edges):
-        """Constructs a domain-blind directed graph with typed edges and coupling weights."""
+    def get_scaled_latency_limit(self, active_nodes: int) -> float:
+        """Iteration 5.0 logarithmic budget scaling for clique-complex enumeration."""
+        return self.base_latency_limit_ms * math.log2(max(1, active_nodes) + 1)
+
+    def build_graph(
+        self,
+        nodes: Dict[str, Dict[str, Any]],
+        edges: List[Tuple[str, str, str, float]],
+    ) -> nx.DiGraph:
         G = nx.DiGraph()
         for n_id, meta in nodes.items():
-            pillar = meta.get("pillar", "E")
-            if pillar not in VALID_PILLARS:
-                raise ValueError(f"Invalid 3+1 pillar: {pillar}")
-            G.add_node(n_id, pillar=pillar, domain_label=meta.get("label", n_id))
-
+            G.add_node(
+                n_id,
+                pillar=meta.get("pillar", "E"),
+                domain_label=meta.get("label", n_id),
+            )
         for u, v, etype, weight in edges:
-            if etype not in VALID_EDGE_TYPES:
-                raise ValueError(f"Invalid edge type: {etype}")
+            if etype not in self.VALID_EDGES:
+                raise ValueError(f"Invalid edge type '{etype}'. Must be in {self.VALID_EDGES}")
             G.add_edge(u, v, type=etype, weight=float(weight))
         return G
 
-    def filter_persistence(self, G):
-        """Prunes low-persistence noise edges below the coupling threshold."""
+    def filter_persistence(self, G: nx.DiGraph) -> Tuple[nx.DiGraph, int]:
         G_clean = nx.DiGraph()
         G_clean.add_nodes_from(G.nodes(data=True))
-        pruned_count = 0
-
+        pruned = 0
         for u, v, data in G.edges(data=True):
+            self.ema.update_and_score("edge_coupling", data["weight"])
             if data["weight"] >= self.persistence_threshold:
                 G_clean.add_edge(u, v, **data)
             else:
-                pruned_count += 1
+                pruned += 1
+        return G_clean, pruned
 
-        return G_clean, pruned_count
+    def compute_betti_numbers(self, G: nx.DiGraph) -> Dict[str, Any]:
+        """Builds an undirected Clique Complex (0, 1, 2, 3-simplices) and computes
+        exact Betti numbers (Beta_0, Beta_1, Beta_2) over GF(2) within scaled latency budget.
+        """
+        start_ms = time.perf_counter() * 1000.0
+        n_nodes = G.number_of_nodes()
+        budget_ms = self.get_scaled_latency_limit(n_nodes)
 
-    def compute_betti_summary(self, G):
-        """Computes H0 (connected components) and H1 (independent cycles)."""
-        undirected = G.to_undirected()
-        h0 = nx.number_connected_components(undirected)
-        cycles = list(nx.simple_cycles(G))
-        h1 = len(cycles)
-        return {"H0": h0, "H1": h1, "cycles": cycles}
+        U = G.to_undirected()
+        vertices = sorted(U.nodes())
+        v_idx = {v: i for i, v in enumerate(vertices)}
 
-    def evaluate_mdl_compression(self, subgraph_nodes, subgraph_edges):
-        """Calculates bit savings for encapsulating an arrangement into a single Holon."""
-        n = len(subgraph_nodes)
-        e = len(subgraph_edges)
-        raw_bits = (n * 8) + (e * 12)
-        compressed_bits = 18 + (2 * 4)
-        savings = raw_bits - compressed_bits
-        return raw_bits, compressed_bits, savings
+        edges = sorted(tuple(sorted((u, v))) for u, v in U.edges() if u != v)
+        e_idx = {e: i for i, e in enumerate(edges)}
 
-    def diagnose_3plus1_balance(self, G, node_subset):
-        """Checks E, B, C representation inside an arrangement to spot functional deficits."""
-        counts = {"E": 0, "B": 0, "C": 0, "O": 0}
-        for n in node_subset:
-            p = G.nodes[n]["pillar"]
-            counts[p] += 1
+        # Enumerate 2-simplices (triangles) and 3-simplices (tetrahedra)
+        cliques = list(nx.enumerate_all_cliques(U))
+        triangles = sorted(tuple(sorted(c)) for c in cliques if len(c) == 3)
+        t_idx = {t: i for i, t in enumerate(triangles)}
 
-        missing = [p for p in ("E", "B", "C") if counts[p] == 0]
-        return counts, missing
+        elapsed = (time.perf_counter() * 1000.0) - start_ms
+        capped_3simplices = elapsed > budget_ms
+        tetrahedra = [] if capped_3simplices else sorted(tuple(sorted(c)) for c in cliques if len(c) == 4)
 
-    def compute_surprise_score(self, G_clean, cycle_nodes, num_null_samples=500):
-        """Benchmarks mean edge persistence against an unbiased Beta(2,2) background prior."""
+        # Boundary matrix d1: edges -> vertices
+        d1 = np.zeros((len(vertices), len(edges)), dtype=np.uint8)
+        for j, (u, v) in enumerate(edges):
+            d1[v_idx[u], j] = 1
+            d1[v_idx[v], j] = 1
+
+        # Boundary matrix d2: triangles -> edges
+        d2 = np.zeros((len(edges), len(triangles)), dtype=np.uint8)
+        for j, (u, v, w) in enumerate(triangles):
+            for face in [(u, v), (u, w), (v, w)]:
+                d2[e_idx[face], j] = 1
+
+        # Boundary matrix d3: tetrahedra -> triangles
+        d3 = np.zeros((len(triangles), len(tetrahedra)), dtype=np.uint8)
+        for j, tet in enumerate(tetrahedra):
+            for face in combinations(tet, 3):
+                d3[t_idx[tuple(sorted(face))], j] = 1
+
+        r1 = _gf2_rank(d1)
+        r2 = _gf2_rank(d2)
+        r3 = _gf2_rank(d3)
+
+        beta_0 = len(vertices) - r1
+        beta_1 = (len(edges) - r1) - r2
+        beta_2 = (len(triangles) - r2) - r3
+
+        return {
+            "betti": [int(beta_0), int(beta_1), int(beta_2)],
+            "simplices": {
+                "vertices": len(vertices),
+                "edges": len(edges),
+                "triangles": len(triangles),
+                "tetrahedra": len(tetrahedra),
+            },
+            "latency_capped": capped_3simplices,
+        }
+
+    def compute_surprise_score(
+        self, cycle_nodes: List[str], G_clean: nx.DiGraph, num_null_samples: int = 500
+    ) -> Tuple[float, float]:
         cycle_edges = [
             G_clean[cycle_nodes[i]][cycle_nodes[(i + 1) % len(cycle_nodes)]]["weight"]
             for i in range(len(cycle_nodes))
         ]
-        observed_persistence = float(np.mean(cycle_edges))
-
+        obs_p = float(np.mean(cycle_edges))
         rng = np.random.default_rng(42)
         null_means = [
             float(np.mean(rng.beta(2.0, 2.0, size=len(cycle_nodes))))
             for _ in range(num_null_samples)
         ]
-        mu = np.mean(null_means)
-        sigma = np.std(null_means) + 1e-6
-        z_score = (observed_persistence - mu) / sigma
-        return round(observed_persistence, 4), round(float(z_score), 2)
+        mu = float(np.mean(null_means))
+        sigma = float(np.std(null_means)) + 1e-6
+        z_score = (obs_p - mu) / sigma
+        return round(obs_p, 4), round(z_score, 2)
 
-    def discover_and_promote(self, G, domain_name="Unknown_Domain"):
-        """Full pipeline: Filter Noise -> Detect Cycles/Voids -> Score Surprise -> MDL Promote."""
-        G_clean, pruned_edges = self.filter_persistence(G)
-        betti = self.compute_betti_summary(G_clean)
-        report = {
-            "domain": domain_name,
-            "pruned_noise_edges": pruned_edges,
-            "betti_summary": {"H0": betti["H0"], "H1": betti["H1"]},
-            "promoted_holons": [],
-            "rejected_coincidences": [],
-            "global_void_alerts": [],
-        }
+    def evaluate_mdl_compression(self, nodes: List[str], edges: List[Tuple[str, str]]) -> Tuple[int, int, int]:
+        raw_bits = (len(nodes) * 8) + (len(edges) * 12)
+        compressed_bits = 18 + 8
+        return raw_bits, compressed_bits, raw_bits - compressed_bits
 
-        for idx, cycle in enumerate(betti["cycles"]):
-            obs_p, z_score = self.compute_surprise_score(G_clean, cycle)
+    def discover_and_promote(self, G: nx.DiGraph, domain_name: str) -> Dict[str, Any]:
+        G_clean, pruned = self.filter_persistence(G)
+        homology = self.compute_betti_numbers(G_clean)
+        cycles = list(nx.simple_cycles(G_clean))
+        promoted = []
+        rejected = []
+
+        for idx, cycle in enumerate(cycles):
+            obs_p, z_score = self.compute_surprise_score(cycle, G_clean)
             sub_edges = [(cycle[i], cycle[(i + 1) % len(cycle)]) for i in range(len(cycle))]
             _, _, savings = self.evaluate_mdl_compression(cycle, sub_edges)
-            counts, missing_pillars = self.diagnose_3plus1_balance(G_clean, cycle)
+
+            counts = {"E": 0, "B": 0, "C": 0, "O": 0}
+            for n in cycle:
+                counts[G_clean.nodes[n]["pillar"]] += 1
+            missing = [p for p in ("E", "B", "C") if counts[p] == 0]
 
             if z_score >= self.z_cutoff and savings > 0:
                 holon_id = f"{domain_name}_Holon_{idx + 1}"
                 child_kernel = self.kernel.grow_sub_triad(holon_id, profile="STANDARD")
-                holon_record = {
+                record = {
                     "holon_id": holon_id,
-                    "motif": "BALANCING_OR_REINFORCING_LOOP",
                     "nodes": cycle,
-                    "domain_labels": [G_clean.nodes[n]["domain_label"] for n in cycle],
+                    "labels": [G_clean.nodes[n]["domain_label"] for n in cycle],
                     "persistence": obs_p,
                     "z_surprise": z_score,
-                    "mdl_bit_savings": savings,
-                    "pillar_distribution": counts,
-                    "missing_pillars": missing_pillars,
+                    "mdl_savings_bits": savings,
+                    "pillar_balance": counts,
+                    "missing_pillars": missing,
                     "assigned_depth": child_kernel.depth,
                 }
-                self.macro_holons[holon_id] = holon_record
-                report["promoted_holons"].append(holon_record)
+                self.macro_holons[holon_id] = record
+                promoted.append(record)
             else:
-                report["rejected_coincidences"].append(
-                    {
-                        "nodes": cycle,
-                        "persistence": obs_p,
-                        "z_surprise": z_score,
-                        "reason": f"Below Z-cutoff ({self.z_cutoff}) or non-positive MDL savings",
-                    }
-                )
+                rejected.append({"nodes": cycle, "persistence": obs_p, "z_surprise": z_score})
 
-        if betti["H1"] == 0 and G_clean.number_of_edges() > 0:
-            all_nodes = list(G_clean.nodes())
-            counts, missing_pillars = self.diagnose_3plus1_balance(G_clean, all_nodes)
-            report["global_void_alerts"].append(
-                {
-                    "alert_type": "TOPOLOGICAL_VOID_OPEN_LOOP",
-                    "status": "H1=0 (Broken Feedback Cycle)",
-                    "pillar_distribution": counts,
-                    "missing_functional_roles": missing_pillars,
-                    "neighbor_nodes": [
-                        {
-                            "id": n,
-                            "label": G_clean.nodes[n]["domain_label"],
-                            "pillar": G_clean.nodes[n]["pillar"],
-                        }
-                        for n in all_nodes
-                    ],
-                }
-            )
-
-        return report
+        void_alert = None
+        b0, b1, b2 = homology["betti"]
+        if b2 > 0:
+            void_alert = {
+                "type": "TOPOLOGICAL_2D_CAVITY_H2",
+                "signature": f"Betti={homology['betti']} ({b2} hollow 2D shell(s) detected)",
+                "missing_pillars": ["O", "B"],
+                "exposed_nodes": [
+                    {"id": n, **G_clean.nodes[n]} for n in G_clean.nodes()
+                ],
+            }
+        elif len(promoted) == 0 and G_clean.number_of_nodes() >= 3:
+            counts = {"E": 0, "B": 0, "C": 0}
+            for n in G_clean.nodes():
+                p = G_clean.nodes[n]["pillar"]
+                if p in counts:
+                    counts[p] += 1
+            missing = [p for p, c in counts.items() if c == 0]
+            void_alert = {
+                "type": "TOPOLOGICAL_VOID_OPEN_LOOP",
+                "signature": f"H1=0 (Broken Feedback Cycle, Betti={homology['betti']})",
+                "missing_pillars": missing,
+                "exposed_nodes": [
+                    {"id": n, **G_clean.nodes[n]} for n in G_clean.nodes()
+                ],
+            }
+        return {
+            "domain": domain_name,
+            "pruned_noise_edges": pruned,
+            "betti_summary": homology,
+            "promoted_holons": promoted,
+            "rejected_coincidences": rejected,
+            "void_alert": void_alert,
+        }
 
 
 class TopologicalDiscoveryAdapter(BaseDomainAdapter):
-    """Connects TopologicalHolonEngine telemetry to Universal3Plus1Kernel governance."""
+    """Connects TopologicalHolonEngine telemetry to Universal3Plus1Kernel."""
 
-    def __init__(self, engine, latest_report=None):
+    def init(self, engine: TopologicalHolonEngine, latest_report: Optional[Dict[str, Any]] = None):
         self.engine = engine
         self.latest_report = latest_report or {}
 
-    def sense(self, current_weights):
-        promoted = len(self.latest_report.get("promoted_holons", []))
-        voids = len(self.latest_report.get("global_void_alerts", []))
-        variance = round(float(promoted + voids) * 0.1, 4)
-        external_shift = voids > 0
-        return {"variance": variance, "external_shift": external_shift}
+    def sense(self, current_weights: Dict[str, float]) -> Dict[str, Any]:
+        promoted = self.latest_report.get("promoted_holons", [])
+        void_alert = self.latest_report.get("void_alert")
+        variance = 0.0 if len(promoted) == 0 else min(1.0, len(promoted) * 0.25)
+        return {
+            "variance": variance,
+            "external_shift": void_alert is not None,
+        }
 
-    def act(self, updated_weights, mode):
+    def act(self, updated_weights: Dict[str, float], mode: str) -> Dict[str, Any]:
+        directives = {
+            "MODE_A_STABILIZE": "PRUNE_NOISE_AND_CAP_SIMPLEX_DEPTH",
+            "MODE_B_GENERATIVE_SPARK": "RELAX_EDGE_CONSTRAINTS_FOR_ANALOGY_SEARCH",
+            "QUARANTINE_RESET": "HALT_HYPOTHESIS_GEN_AND_RESTORE_SEED",
+            "STEADY_STATE": "SCAN_AND_PROMOTE_HOLONS",
+        }
         return {
             "governance_mode": mode,
-            "updated_weights": updated_weights,
-            "active_macro_holons": list(self.engine.macro_holons.keys()),
+            "directive": directives.get(mode, "SCAN_AND_PROMOTE_HOLONS"),
+            "weights": updated_weights,
         }
