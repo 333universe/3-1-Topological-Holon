@@ -7,23 +7,31 @@ on:
     branches: [ main ]
 
 jobs:
-  verify-engine:
+  verify-topology:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies
+      - name: Install dependencies and package
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install -e ".[dev]"
 
-      - name: Run End-to-End Fractal & Void Discovery Benchmark
+      - name: Run pytest suite
+        run: |
+          pytest
+
+      - name: Verify fractal discovery benchmark
         run: |
           python examples/demo_fractal_discovery.py
