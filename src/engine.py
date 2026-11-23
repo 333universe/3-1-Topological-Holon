@@ -285,7 +285,7 @@ class TopologicalHolonEngine:
 class TopologicalDiscoveryAdapter(BaseDomainAdapter):
     """Connects TopologicalHolonEngine telemetry to Universal3Plus1Kernel."""
 
-    def init(self, engine: TopologicalHolonEngine, latest_report: Optional[Dict[str, Any]] = None):
+    def __init__(self, engine: TopologicalHolonEngine, latest_report: Optional[Dict[str, Any]] = None):
         self.engine = engine
         self.latest_report = latest_report or {}
 
