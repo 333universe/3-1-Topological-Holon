@@ -19,7 +19,7 @@ class SemanticCoPilotBridge:
     def build_hypothesis_prompt(self, source_report, target_report):
         """Constructs a domain-grounded discovery prompt from topological comparisons."""
         source_holons = source_report.get("promoted_holons", [])
-        target_voids = target_report.get("global_void_alerts", [])
+        target_void = target_report.get("void_alert")
 
         prompt_lines = [
             "=== 3+1 TOPOLOGICAL HOLON DISCOVERY BRIEF ===",
@@ -31,20 +31,25 @@ class SemanticCoPilotBridge:
 
         for h in source_holons:
             prompt_lines.append(
-                f"   - Holon ID: {h['holon_id']} | Z-Surprise: {h['z_surprise']} | Nodes: {h['domain_labels']}"
+                f"   - Holon ID: {h['holon_id']} | Z-Surprise: {h['z_surprise']} | Nodes: {h['labels']}"
             )
 
         prompt_lines.append("")
         prompt_lines.append("2. TARGET DOMAIN TOPOLOGICAL VOID & 3+1 DIAGNOSIS:")
 
-        for v in target_voids:
+        if target_void:
             missing_desc = [
                 f"{m} -> {self.PILLAR_DESCRIPTIONS.get(m, m)}"
-                for m in v["missing_functional_roles"]
+                for m in target_void.get("missing_pillars", [])
             ]
-            prompt_lines.append(f"   - Alert: {v['alert_type']} ({v['status']})")
-            prompt_lines.append(f"   - Missing 3+1 Pillar(s): {', '.join(missing_desc)}")
-            prompt_lines.append(f"   - Exposed Boundary Nodes: {json.dumps(v['neighbor_nodes'])}")
+            prompt_lines.append(f"   - Alert: {target_void['type']} (DETECTED)")
+            prompt_lines.append(f"   - Signature: {target_void['signature']}")
+            prompt_lines.append(f"   - Missing 3+1 Pillar(s): {', '.join(missing_desc) or 'None'}")
+            prompt_lines.append(
+                f"   - Exposed Boundary Nodes: {json.dumps(target_void.get('exposed_nodes', []))}"
+            )
+        else:
+            prompt_lines.append("   - No topological void detected in the target report.")
 
         prompt_lines.extend(
             [
