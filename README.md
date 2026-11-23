@@ -2,41 +2,48 @@
 [![3+1 Topological Holon CI](https://github.com/333universe/3-1-Topological-Holon/actions/workflows/ci.yml/badge.svg)](https://github.com/333universe/3-1-Topological-Holon/actions/workflows/ci.yml)
 
 
-# 3+1 Topological Holon Discovery Engine
+ # 3+1 Topological Holon Discovery Engine
 
-A domain-agnostic, scale-invariant discovery engine that unifies **Object–Arrangement Duality**, **Algebraic Topology (Persistent Homology & Betti Signatures)**, and the **3+1 Holographic Systems Architecture (`0.3333 E + 0.3333 B + 0.3333 C + 0.0001 Orchestrator = 1.0000`)**.
+A domain-agnostic **Topological Discovery Engine** built on **Object–Arrangement Duality**, **GF(2) Simplicial Homology (Beta_0, Beta_1, Beta_2)**, and the **3+1 Holographic Systems Architecture**.
 
-Instead of keyword lookup, this engine strips surface domain labels to reveal hidden structural isomorphisms across unrelated fields (e.g., cellular metabolism vs. supply chains), diagnoses missing functional pillars inside topological voids, and autonomously promotes persistent arrangements into higher-order **Holons** via Minimum Description Length (MDL) compression.
+Instead of retrieving pre-labeled documents via rigid keywords or vector distances, this engine treats every entity as a scale-fluid **Holon**—simultaneously a unified **Object** (`1.0000`) from the outside and a relational **Arrangement** (`0.3333 E + 0.3333 B + 0.3333 C + 0.0001 O`) on the inside—to discover cross-domain structural analogies and diagnose missing functional pillars inside topological voids.
 
 ---
 
 ## Core Architecture
 
-1. **Object–Arrangement Duality (`Holons`):** Every entity is simultaneously a unified `1.0000` object at macro-scale and a relational arrangement of sub-holons when unpacked via `grow_sub_triad()`.
-2. **Minimal Topological Grammar:**
-   - **5 Typed Edge Primitives:** `AMPLIFIES (+)`, `INHIBITS (-)`, `DELAYS (~)`, `TRANSFORMS (→)`, `CONTAINS (⊂)`
-   - **6 Universal Motifs:** Reinforcing Loop, Balancing Loop, Bottleneck, Feed-Forward Gate, Bifurcation Switch, and Multi-Scale Cascade.
-3. **3+1 Functional Partition (`E, B, C, O`):**
-   - **Efficiency (`0.3333`):** Throughput, execution, and flow catalysts.
-   - **Balance (`0.3333`):** Containment, negative feedback brakes, and verification.
-   - **Change (`0.3333`):** Adaptive switches, mutations, and bifurcation triggers.
-   - **Orchestrator (`0.0001`):** Orthogonal meta-router governing Mode A (anti-chaos stabilization), Mode B (anti-stagnation symmetry breaking), and `±1%` quarantine resets.
-4. **Calibrated Null-Model Surprise Scoring ($Z_{\text{surprise}}$) & MDL Compression:** Filters out coincidental noise loops and triggers autonomous scale-shifting only when encapsulating an arrangement saves bit description cost.
+1. **Invariant 3+1 Holographic Base Kernel (`src/kernel.py`):**
+   * Enforces the conservation law `E (0.3333) + B (0.3333) + C (0.3333) + O (0.0001) = 1.0000`.
+   * Governs search execution via **Mode A** (anti-burnout stabilization), **Mode B** (Delta-Epsilon symmetry-breaking sparks), and recursive fractal scale-shifting (`grow_sub_triad()`).
+2. **GF(2) Simplicial Homology & Surprise Engine (`src/engine.py`):**
+   * Evaluates 5 universal edge primitives (`AMPLIFIES`, `INHIBITS`, `DELAYS`, `TRANSFORMS`, `CONTAINS`).
+   * Computes exact **Betti numbers (Beta_0, Beta_1, Beta_2)** over modulo-2 boundary matrices to detect broken feedback loops (`H_1 = 0`) and hollow 2D shells (`H_2 > 0`).
+   * Filters coincidental noise via **Null-Model Z-Surprise scoring** and promotes high-persistence arrangements into higher-order Holons via **Minimum Description Length (MDL)** compression.
+3. **Real-World Data Loaders (`src/loaders.py`):**
+   * Ingests raw CSV relational edge lists (`load_from_csv_text`) and multivariate numerical time-series (`load_from_time_series` with lagged cross-correlation) with automatic `E / B / C / O` pillar inference (`auto_infer_pillars`).
+4. **Semantic Co-Pilot Bridge (`src/copilot.py`):**
+   * Translates detected topological voids and cross-domain isomorphisms into structured scientific or strategic hypothesis prompts.
 
 ---
 
 ## Repository Structure
 
 ```text
-3plus1-topological-holon/
-├── README.md
-├── requirements.txt
+3-1-Topological-Holon/
+├── .github/workflows/ci.yml           # Automated GitHub Actions verification
+├── examples/
+│   └── demo_fractal_discovery.py      # 3-part benchmark (Voids, Depth 0-2 Fractal, H2 Cavities)
+├── notebooks/
+│   └── quickstart.ipynb               # One-click Google Colab quickstart
 ├── src/
-│   ├── kernel.py       # Invariant Universal3Plus1Kernel (v5.0 Spec Compliant)
-│   ├── engine.py       # TopologicalHolonEngine, MDL Compression & Z-Surprise Scorer
-│   └── copilot.py      # Step 5 SemanticCoPilotBridge for hypothesis generation
-└── examples/
-    └── demo_discovery.py
+│   ├── __init__.py
+│   ├── kernel.py                      # Universal3Plus1Kernel & BaseDomainAdapter
+│   ├── engine.py                      # TopologicalHolonEngine & GF(2) Betti Solver
+│   ├── loaders.py                     # CSV & Lagged Time-Series Ingestion Adapters
+│   └── copilot.py                     # SemanticCoPilotBridge
+├── LICENSE
+├── README.md
+└── requirements.txt
 ```
 
 ---
@@ -44,12 +51,9 @@ Instead of keyword lookup, this engine strips surface domain labels to reveal hi
 ## Quickstart
 
 ```bash
-# 1. Install dependencies
+git clone https://github.com
+cd 3-1-Topological-Holon
 pip install -r requirements.txt
-
-# 2. Run the cross-domain & multi-scale discovery demo
-python examples/demo_discovery.py
+python examples/demo_fractal_discovery.py
 ```
 
-## License
-MIT License
