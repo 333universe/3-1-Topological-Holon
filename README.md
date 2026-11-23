@@ -50,7 +50,7 @@ Instead of retrieving pre-labeled documents via rigid keywords or vector distanc
 
 ## Quickstart
 
-```bash
+```
 git clone https://github.com
 cd 3-1-Topological-Holon
 pip install -e ".[dev]"
