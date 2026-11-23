@@ -1,4 +1,3 @@
-
 import math
 import numpy as np
 import pytest
@@ -11,7 +10,6 @@ from src.engine import (
     _gf2_rank,
 )
 from src.loaders import (
-    auto_infer_pillars,
     load_from_csv_text,
     load_from_time_series,
 )
@@ -41,7 +39,7 @@ def test_kernel_conservation_law():
     kernel = Universal3Plus1Kernel(profile="STANDARD")
     total = sum(kernel.weights.values())
     assert math.isclose(total, 1.0000, rel_tol=1e-9)
-    assert kernel.weights["O"] == 0.0001
+    assert kernel.weights.get("O") == 0.0001
 
 
 def test_kernel_invalid_profile_raises():
@@ -51,35 +49,30 @@ def test_kernel_invalid_profile_raises():
 
 def test_kernel_core_quarantine_reset():
     kernel = Universal3Plus1Kernel(profile="STANDARD")
-    # Corrupt the 0.0001 Holographic Orchestrator core
-    kernel.weights["O"] = 0.0050
+    kernel.weights.update({"O": 0.0050})
     result = kernel.step(DummySteadyAdapter())
-    assert result["mode"] == "QUARANTINE_RESET"
+    assert result.get("mode") == "QUARANTINE_RESET"
     assert kernel.weights == kernel.immutable_seed
 
 
 def test_kernel_mode_a_stabilize_on_bound_breach():
     kernel = Universal3Plus1Kernel(profile="TIGHT")
-    # Force Efficiency above TIGHT ceiling (0.3600)
-    kernel.weights["E"] = 0.4500
-    kernel.weights["B"] = 0.2166
+    kernel.weights.update({"E": 0.4500, "B": 0.2166})
     result = kernel.step(DummySteadyAdapter())
-    assert result["mode"] == "MODE_A_STABILIZE"
+    assert result.get("mode") == "MODE_A_STABILIZE"
     assert kernel.weights == {"E": 0.3333, "B": 0.3333, "C": 0.3333, "O": 0.0001}
 
 
 def test_kernel_mode_b_spark_and_elasticity_return():
     kernel = Universal3Plus1Kernel(profile="STANDARD")
-    # Step 1: Stagnant variance + external shift triggers Mode B
     res1 = kernel.step(DummyStagnantShiftAdapter())
-    assert res1["mode"] == "MODE_B_GENERATIVE_SPARK"
-    assert kernel.weights["C"] == 0.4000
-    assert kernel.weights["E"] == 0.2666
+    assert res1.get("mode") == "MODE_B_GENERATIVE_SPARK"
+    assert kernel.weights.get("C") == 0.4000
+    assert kernel.weights.get("E") == 0.2666
     assert kernel.elasticity_timer == 1
 
-    # Step 2: Steady adapter decrements elasticity timer and restores parity
     res2 = kernel.step(DummySteadyAdapter())
-    assert res2["mode"] == "STEADY_STATE"
+    assert res2.get("mode") == "STEADY_STATE"
     assert kernel.elasticity_timer == 0
     assert kernel.weights == {"E": 0.3333, "B": 0.3333, "C": 0.3333, "O": 0.0001}
 
@@ -92,9 +85,10 @@ def test_kernel_fractal_sub_triad_recursion():
     assert child.depth == 1
     assert grandchild.depth == 2
     tree = root.get_fractal_tree()
-    assert tree["depth"] == 0
-    assert "B" in tree["children"]
-    assert "C" in tree["children"]["B"]["children"]
+    assert tree.get("depth") == 0
+    children = tree.get("children", {})
+    assert "B" in children
+    assert "C" in children.get("B", {}).get("children", {})
 
 
 # ==============================================================================
@@ -104,13 +98,8 @@ def test_kernel_fractal_sub_triad_recursion():
 
 def test_gf2_rank_modulo_two_cancellation():
     # Three edges forming a triangle over GF(2) have linearly dependent rows (rank 2)
-    triangle_d1 = np.array(
-        [,
- ,
- ,
-        ],
-        dtype=np.uint8,
-    )
+    triangle_d1 = np.zeros((3, 3), dtype=np.uint8)
+    np.put(triangle_d1, (0, 1, 3, 5, 7, 8), 1)
     assert _gf2_rank(triangle_d1) == 2
 
 
@@ -137,52 +126,59 @@ def test_betti_closed_loop_h1_vs_open_chain():
         "N3": {"pillar": "B", "label": "Inhibitor"},
         "N4": {"pillar": "E", "label": "Sensor"},
     }
-    # 4-cycle has no 3-cliques (triangles), so Beta_0 = 1, Beta_1 = 1, Beta_2 = 0
-    closed_edges = [
-        ("N1", "N2", "AMPLIFIES", 0.92),
-        ("N2", "N3", "TRANSFORMS", 0.90),
-        ("N3", "N4", "INHIBITS", 0.91),
-        ("N4", "N1", "DELAYS", 0.93),
-    ]
-    G_closed = engine.build_graph(nodes, closed_edges)
+    e1 = ("N1", "N2", "AMPLIFIES", 0.92)
+    e2 = ("N2", "N3", "TRANSFORMS", 0.90)
+    e3 = ("N3", "N4", "INHIBITS", 0.91)
+    e4 = ("N4", "N1", "DELAYS", 0.93)
+
+    G_closed = engine.build_graph(nodes, [e1, e2, e3, e4])
     report_closed = engine.discover_and_promote(G_closed, "ClosedDomain")
 
-    assert report_closed["betti_summary"]["betti"] == [1, 1, 0]
-    assert len(report_closed["promoted_holons"]) == 1
-    assert report_closed["void_alert"] is None
-    assert report_closed["promoted_holons"][0]["assigned_depth"] == 1
+    betti_closed = tuple(report_closed.get("betti_summary", {}).get("betti", ()))
+    assert betti_closed == (1, 1, 0)
+
+    promoted = report_closed.get("promoted_holons", [])
+    assert len(promoted) == 1
+    assert report_closed.get("void_alert") is None
+    first_holon = next(iter(promoted))
+    assert first_holon.get("assigned_depth") == 1
 
     # Remove inhibitory return edge -> broken feedback loop (Beta_1 = 0 -> void alert)
-    open_edges = closed_edges[:3]
-    G_open = engine.build_graph(nodes, open_edges)
+    G_open = engine.build_graph(nodes, [e1, e2, e3])
     report_open = engine.discover_and_promote(G_open, "BrokenDomain")
 
-    assert report_open["betti_summary"]["betti"] == [1, 0, 0]
-    assert len(report_open["promoted_holons"]) == 0
-    assert report_open["void_alert"] is not None
-    assert report_open["void_alert"]["type"] == "TOPOLOGICAL_VOID_OPEN_LOOP"
+    betti_open = tuple(report_open.get("betti_summary", {}).get("betti", ()))
+    assert betti_open == (1, 0, 0)
+    assert len(report_open.get("promoted_holons", [])) == 0
+    void_open = report_open.get("void_alert")
+    assert void_open is not None
+    assert void_open.get("type") == "TOPOLOGICAL_VOID_OPEN_LOOP"
 
 
 def test_betti_h2_octahedral_cavity_detection():
     engine = TopologicalHolonEngine(Universal3Plus1Kernel(), persistence_threshold=0.35)
-    # Octahedron: 6 vertices, 12 edges, 8 triangles, 0 tetrahedra -> Betti = [1, 0, 1]
-    verts = ["v0", "v1", "v2", "v3", "v4", "v5"]
+    verts = ("v0", "v1", "v2", "v3", "v4", "v5")
     nodes = {v: {"pillar": "E", "label": v} for v in verts}
-    opposite = {("v0", "v5"), ("v5", "v0"), ("v1", "v3"), ("v3", "v1"), ("v2", "v4"), ("v4", "v2")}
+    opposite = {
+        ("v0", "v5"), ("v5", "v0"),
+        ("v1", "v3"), ("v3", "v1"),
+        ("v2", "v4"), ("v4", "v2"),
+    }
 
     edges = []
-    for i in range(len(verts)):
-        for j in range(i + 1, len(verts)):
-            u, v = verts[i], verts[j]
-            if (u, v) not in opposite:
+    for i, u in enumerate(verts):
+        for j, v in enumerate(verts):
+            if i < j and (u, v) not in opposite:
                 edges.append((u, v, "AMPLIFIES", 0.95))
 
     G_oct = engine.build_graph(nodes, edges)
     report = engine.discover_and_promote(G_oct, "HollowShellDomain")
 
-    assert report["betti_summary"]["betti"] == [1, 0, 1]
-    assert report["void_alert"] is not None
-    assert report["void_alert"]["type"] == "TOPOLOGICAL_2D_CAVITY_H2"
+    betti_oct = tuple(report.get("betti_summary", {}).get("betti", ()))
+    assert betti_oct == (1, 0, 1)
+    void_oct = report.get("void_alert")
+    assert void_oct is not None
+    assert void_oct.get("type") == "TOPOLOGICAL_2D_CAVITY_H2"
 
 
 def test_discovery_adapter_integration():
@@ -195,8 +191,8 @@ def test_discovery_adapter_integration():
     adapter = TopologicalDiscoveryAdapter(engine, latest_report=fake_void_report)
     action = kernel.step(adapter)
 
-    assert action["governance_mode"] == "MODE_B_GENERATIVE_SPARK"
-    assert action["directive"] == "RELAX_EDGE_CONSTRAINTS_FOR_ANALOGY_SEARCH"
+    assert action.get("governance_mode") == "MODE_B_GENERATIVE_SPARK"
+    assert action.get("directive") == "RELAX_EDGE_CONSTRAINTS_FOR_ANALOGY_SEARCH"
 
 
 # ==============================================================================
@@ -214,15 +210,14 @@ def test_csv_loader_and_pillar_inference():
     nodes, edges = load_from_csv_text(csv_data, auto_pillars=True)
     assert len(nodes) == 3
     assert len(edges) == 3
-    # Weights should be normalized against max weight (10.0)
-    assert edges[0][3] == 1.0
-    assert edges[1][3] == 0.8
-    # Node C participates in INHIBITS and has both in_deg >= 1 and out_deg >= 1 -> pillar B
-    assert nodes["C"]["pillar"] == "B"
+
+    weight_by_src = {src: w for src, _, _, w in edges}
+    assert weight_by_src.get("A") == 1.0
+    assert weight_by_src.get("B") == 0.8
+    assert nodes.get("C", {}).get("pillar") == "B"
 
 
 def test_time_series_loader_detects_lagged_inhibition():
-    # X drives Y at lag 1, and Y suppresses X at lag 1
     series = {
         "Driver": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
         "Brake": [8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0],
@@ -248,7 +243,7 @@ def test_copilot_bridge_prompt_generation():
         "domain": "Supply Chain Logistics",
         "void_alert": {
             "type": "TOPOLOGICAL_VOID_OPEN_LOOP",
-            "signature": "H1=0 (Broken Feedback Cycle, Betti=[1, 0, 0])",
+            "signature": "H1=0 (Broken Feedback Cycle, Betti=(1, 0, 0))",
             "missing_pillars": ["B"],
             "exposed_nodes": [{"id": "PortA", "pillar": "E"}],
         },
