@@ -51,10 +51,9 @@ Instead of retrieving pre-labeled documents via rigid keywords or vector distanc
 ## Quickstart
 
 ```
-git clone https://github.com
-cd 3-1-Topological-Holon
-pip install -e ".[dev]"
-python examples/demo_fractal_discovery.py
+!rm -rf 3-1-Topological-Holon
+!git clone https://github.com/333universe/3-1-Topological-Holon
+!python 3-1-Topological-Holon/examples/demo_fractal_discovery.py
 ```
 
 
