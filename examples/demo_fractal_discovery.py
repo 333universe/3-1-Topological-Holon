@@ -1,9 +1,9 @@
+"""End-to-end demonstration & CI benchmark of the 3+1 Topological Holon Engine.
 
-"""End-to-end demonstration of the 3+1 Topological Holon Discovery Engine.
-
-Runs two verified benchmarks in a single command:
+Verifies three core capabilities in a single command:
 1. Cross-Domain Isomorphism & Functional Void Detection (Biology vs. Supply Chain)
 2. Multi-Level Fractal Scale-Shifting (Depth 0 -> Depth 1 -> Depth 2)
+3. Z2 Simplicial Homology & 2D Cavity Detection (Solid Tetrahedron vs. Hollow Octahedron)
 """
 
 import json
@@ -71,6 +71,9 @@ def run_cross_domain_void_demo():
     G_supply = engine.build_graph(supply_nodes, supply_edges)
     supply_report = engine.discover_and_promote(G_supply, domain_name="Global_Supply_Chain")
 
+    assert len(bio_report["promoted_holons"]) == 1, "Expected 1 promoted reference Holon"
+    assert supply_report["void_alert"]["missing_pillars"] == ["B"], "Expected missing Balance pillar"
+
     adapter = TopologicalDiscoveryAdapter(engine, latest_report=supply_report)
     gov_status = kernel.step(adapter)
 
@@ -118,8 +121,10 @@ def run_fractal_depth2_demo():
     G_micro = sub_engine.build_graph(micro_nodes, micro_edges)
     depth2_report = sub_engine.discover_and_promote(G_micro, domain_name="Micro_Pathway")
 
-    h1_id = depth2_report["promoted_holons"][0]["holon_id"]
-    h2_id = depth2_report["promoted_holons"][1]["holon_id"]
+    assert len(depth2_report["promoted_holons"]) == 2, "Expected 2 promoted Depth-2 Holons"
+    h1, h2 = depth2_report["promoted_holons"]
+    h1_id = h1["holon_id"]
+    h2_id = h2["holon_id"]
 
 
     # Collapse the two Depth-2 Holons into Objects at Depth 1
@@ -138,13 +143,78 @@ def run_fractal_depth2_demo():
     G_meso = meso_engine.build_graph(meso_nodes, meso_edges)
     depth1_report = meso_engine.discover_and_promote(G_meso, domain_name="Meso_Organelle")
 
-    promoted_meso = depth1_report["promoted_holons"][0]
+    promoted_meso = depth1_report["promoted_holons"].pop(0)
+
+    assert promoted_meso["missing_pillars"] == [], "Expected balanced E/B/C triad at Depth 1"
+
     print(f"Depth 2 Holons Promoted: {len(depth2_report['promoted_holons'])}")
     print(f"Depth 1 Meso-Holon:      {promoted_meso['holon_id']} (Missing Pillars: {promoted_meso['missing_pillars']})")
     print("\nActive 3+1 Fractal Kernel Tree:")
     print(json.dumps(root_kernel.get_fractal_tree(), indent=2))
 
 
+def run_h2_cavity_demo():
+    print("\n" + "=" * 72)
+    print("PART 3: Z2 SIMPLICIAL HOMOLOGY & 2D CAVITY DETECTION (BETA_2)")
+    print("=" * 72)
+
+    kernel = Universal3Plus1Kernel(profile="WIDE")
+    engine = TopologicalHolonEngine(kernel=kernel, persistence_threshold=0.35, z_cutoff=2.5)
+
+    # 1. Solid 4-Node Tetrahedron (4 Triangles sealed by 1 Tetrahedron -> Betti =)
+    tet_nodes = {
+        "T1": {"label": "Agent_Alpha", "pillar": "E"},
+        "T2": {"label": "Agent_Beta", "pillar": "B"},
+        "T3": {"label": "Agent_Gamma", "pillar": "C"},
+        "T4": {"label": "Central_Mediator", "pillar": "O"},
+    }
+    tet_edges = [
+        ("T1", "T2", "AMPLIFIES", 0.90),
+        ("T1", "T3", "TRANSFORMS", 0.90),
+        ("T1", "T4", "INHIBITS", 0.90),
+        ("T2", "T3", "AMPLIFIES", 0.90),
+        ("T2", "T4", "DELAYS", 0.90),
+        ("T3", "T4", "INHIBITS", 0.90),
+    ]
+    G_tet = engine.build_graph(tet_nodes, tet_edges)
+    tet_report = engine.discover_and_promote(G_tet, domain_name="Solid_Tetrahedron")
+
+    # 2. Hollow 6-Node Octahedron (8 Triangles, 0 Tetrahedra -> Betti =)
+    oct_nodes = {
+        "N1": {"label": "North_Supply_Hub", "pillar": "E"},
+        "N6": {"label": "South_Demand_Hub", "pillar": "E"},
+        "N2": {"label": "East_Logistics_Node", "pillar": "C"},
+        "N4": {"label": "West_Manufacturing_Node", "pillar": "C"},
+        "N3": {"label": "Front_Risk_Monitor", "pillar": "B"},
+        "N5": {"label": "Back_Compliance_Gate", "pillar": "B"},
+    }
+    oct_edges = [
+        ("N2", "N3", "AMPLIFIES", 0.92),
+        ("N3", "N4", "INHIBITS", 0.91),
+        ("N4", "N5", "TRANSFORMS", 0.90),
+        ("N5", "N2", "DELAYS", 0.89),
+        ("N1", "N2", "TRANSFORMS", 0.93),
+        ("N1", "N3", "INHIBITS", 0.91),
+        ("N1", "N4", "AMPLIFIES", 0.90),
+        ("N1", "N5", "DELAYS", 0.92),
+        ("N2", "N6", "AMPLIFIES", 0.91),
+        ("N3", "N6", "INHIBITS", 0.90),
+        ("N4", "N6", "TRANSFORMS", 0.92),
+        ("N5", "N6", "DELAYS", 0.89),
+    ]
+    G_oct = engine.build_graph(oct_nodes, oct_edges)
+    oct_report = engine.discover_and_promote(G_oct, domain_name="Hollow_Octahedron")
+
+    assert tuple(tet_report["betti_summary"]["betti"]) == (1, 0, 0), "Expected (1, 0, 0) for solid tetrahedron"
+    assert tuple(oct_report["betti_summary"]["betti"]) == (1, 0, 1), "Expected (1, 0, 1) for hollow octahedron"
+    assert oct_report["void_alert"]["type"] == "TOPOLOGICAL_2D_CAVITY_H2"
+
+    print(f"Solid Tetrahedron Betti: {tet_report['betti_summary']['betti']} (Simplices: {tet_report['betti_summary']['simplices']})")
+    print(f"Hollow Octahedron Betti: {oct_report['betti_summary']['betti']} (Simplices: {oct_report['betti_summary']['simplices']})")
+    print(f"2D Cavity Alert:         {oct_report['void_alert']['type']} -> {oct_report['void_alert']['signature']}")
+
+
 if __name__ == "__main__":
     run_cross_domain_void_demo()
     run_fractal_depth2_demo()
+    run_h2_cavity_demo()
